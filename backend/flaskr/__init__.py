@@ -30,7 +30,7 @@ def create_app(test_config=None):
             'Access-Control-Allow-Headers', 'Content-Type,Authorization,true'
         )
         response.headers.add(
-            'Access-Control-Allow-Methods', 'GET,POST,DELETE'
+            'Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS'
         )
         return response
 
@@ -133,27 +133,49 @@ def create_app(test_config=None):
         try:
             body = request.get_json()
 
+            if body is None:
+                abort(400)
+        except:
+            abort(400)
+
+        else:
             new_question = body.get('question', None)
             new_answer = body.get('answer', None)
             new_category = body.get('category', None)
             new_difficulty = body.get('difficulty', None)
+            search_term = body.get('searchTerm', None)
 
-            if not (new_question and new_answer and new_category and new_difficulty):
+            if search_term:
+                search_result = Question.query.order_by(Question.id).filter(Question.question.ilike(f"%{search_term}%"))
+                
+                page = request.args.get('page', 1, type=int)
+                start = (page - 1) * QUESTIONS_PER_PAGE
+                end = start + QUESTIONS_PER_PAGE
+                
+                formatted_questions = [question.format() for question in search_result]
+                questions = formatted_questions[start:end]
+
+                return jsonify({
+                    'success': True, 
+                    'questions': questions, 
+                    'total_questions': len(formatted_questions), 
+                    'current_category': None
+                })
+
+            elif not (new_question and new_answer and new_category and new_difficulty):
                 abort(422)
 
             else:
                 question = Question(question=new_question, answer=new_answer, category=new_category, difficulty=new_difficulty)
                 question.insert()
                 
-            return jsonify({
-                'success': True
-                })
-        except:
-            abort(400)
+                return jsonify({
+                    'success': True
+                    })
 
 
     """
-    @TODO:
+    @TODO: DONE
     Create a POST endpoint to get questions based on a search term.
     It should return any questions for whom the search term
     is a substring of the question.
@@ -217,6 +239,16 @@ def create_app(test_config=None):
                 'error': 400, 
                 'message': 'bad request'
             }), 400
+        )
+
+    @app.errorhandler(405)
+    def method_not_allowed(error):
+        return(
+            jsonify({
+                'success': False, 
+                'error': 405, 
+                'message': 'method not allowed'
+            }), 405
         )
 
     return app
