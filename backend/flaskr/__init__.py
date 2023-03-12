@@ -128,6 +128,7 @@ def create_app(test_config=None):
     the form will clear and the question will appear at the end of the last page
     of the questions list in the "List" tab.
     """
+    # search questions and submit new question
     @app.route('/questions', methods=['POST'])
     def create_new_question():
         try:
@@ -193,6 +194,28 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that
     category to be shown.
     """
+    # get questions by category
+    @app.route('/categories/<int:category_id>/questions')
+    def get_questions_by_category(category_id):
+        page = request.args.get('page', 1, type=int)
+        start = (page - 1) * QUESTIONS_PER_PAGE
+        end = start + QUESTIONS_PER_PAGE
+
+        query = Question.query.order_by(Question.id).filter(Question.category == category_id)
+
+        formatted_questions = [question.format() for question in query]
+        if len(formatted_questions) == 0:
+            abort(404)
+
+        questions = formatted_questions[start:end]
+
+        return jsonify({
+            'success': True, 
+            'questions': questions, 
+            'total_questions': len(formatted_questions), 
+            'current_category': category_id
+        })
+    
 
     """
     @TODO:
