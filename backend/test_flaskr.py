@@ -76,6 +76,16 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(data['success'], False)
         self.assertEqual(data['message'], 'resource not found')
 
+    def test_post_new_question(self):
+        res = self.client().post('/questions', json={"question": "test question", "answer": "test answer", "difficulty": 4, "category": 2})
+        data = json.loads(res.data)
+        question = Question.query.filter(Question.question == "test question")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(data['success'], True)
+        self.assertTrue(question)
+
+
 # Make the tests conveniently executable
 if __name__ == "__main__":
     unittest.main()
