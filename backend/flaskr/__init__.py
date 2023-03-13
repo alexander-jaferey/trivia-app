@@ -256,8 +256,15 @@ def create_app(test_config=None):
             abort(400)
 
         previous_ids = []
-        category = body['quiz_category']['id']
-        previous_questions = body['previous_questions']
+        if 'quiz_category' not in body:
+            category = 0
+        else:
+            category = body['quiz_category']['id']
+
+        if 'previous_questions' not in body:
+            previous_questions = None
+        else:
+            previous_questions = body['previous_questions']
 
         # get ids of previous questions (if any) to avoid resending them
         if previous_questions:
