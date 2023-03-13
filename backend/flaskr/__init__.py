@@ -45,6 +45,7 @@ def create_app(test_config=None):
     def get_categories():
         query = Category.query.order_by(Category.id).all()
         categories = {}
+        # format categories in dict as {id: type}
         for i in query:
             categories[i.id] = i.type
 
@@ -77,12 +78,15 @@ def create_app(test_config=None):
         query = Category.query.order_by(Category.id).all()
 
         categories = {}
+        # format categories in dict as {id: type}
         for i in query:
             categories[i.id] = i.type
 
+        # format and paginate questions
         formatted_questions = [question.format() for question in questions]
         paginated_questions = formatted_questions[start:end]
 
+        # abort 404 if no questions in list
         if len(paginated_questions) == 0:
             abort(404)
 
@@ -107,6 +111,7 @@ def create_app(test_config=None):
     def delete_question(question_id):
         question = Question.query.filter(Question.id == question_id).one_or_none()
 
+        # abort 404 if no question with given ID
         if question is None:
             abort(404)
 
@@ -134,6 +139,7 @@ def create_app(test_config=None):
         try:
             body = request.get_json()
 
+            # abort 400 if request has no body
             if body is None:
                 abort(400)
         except:
@@ -146,13 +152,17 @@ def create_app(test_config=None):
             new_difficulty = body.get('difficulty', None)
             search_term = body.get('searchTerm', None)
 
+            # clause for searching via this endpoint
             if search_term:
+                # case-insensitive filtering for search term
                 search_result = Question.query.order_by(Question.id).filter(Question.question.ilike(f"%{search_term}%"))
                 
+                # set up pagination
                 page = request.args.get('page', 1, type=int)
                 start = (page - 1) * QUESTIONS_PER_PAGE
                 end = start + QUESTIONS_PER_PAGE
                 
+                # format and paginate questions
                 formatted_questions = [question.format() for question in search_result]
                 questions = formatted_questions[start:end]
 
@@ -163,6 +173,8 @@ def create_app(test_config=None):
                     'current_category': None
                 })
 
+            # clause for posting new question
+            # abort 422 if body is missing an attribute
             elif not (new_question and new_answer and new_category and new_difficulty):
                 abort(422)
 
@@ -197,13 +209,18 @@ def create_app(test_config=None):
     # get questions by category
     @app.route('/categories/<int:category_id>/questions')
     def get_questions_by_category(category_id):
+        # set up pagination
         page = request.args.get('page', 1, type=int)
         start = (page - 1) * QUESTIONS_PER_PAGE
         end = start + QUESTIONS_PER_PAGE
 
+        # get list of questions with given category id
         query = Question.query.order_by(Question.id).filter(Question.category == category_id)
 
+        # format and paginate questions
         formatted_questions = [question.format() for question in query]
+        
+        # abort 404 if no questions in list
         if len(formatted_questions) == 0:
             abort(404)
 
@@ -228,6 +245,51 @@ def create_app(test_config=None):
     one question at a time is displayed, the user is allowed to answer
     and shown whether they were correct or not.
     """
+    @app.route('/quizzes', methods=['POST'])
+    def send_quiz_questions():
+        try:
+            body = request.get_json()
+            # abort 400 if request has no body
+            if body is None:
+                abort(400)
+        except:
+            abort(400)
+
+        previous_ids = []
+        category = body['quiz_category']['id']
+        previous_questions = body['previous_questions']
+
+        # get ids of previous questions (if any) to avoid resending them
+        if previous_questions:
+            for question in previous_questions:
+                previous_ids.append(question)
+
+        # get questions, filtering by category if given
+        if category == 0:
+            query = Question.query.all()
+        else:
+            query = Question.query.filter(Question.category == category).all()
+
+        # set up list of formatted questions to work with
+        query_questions = [question.format() for question in query]
+        question_candidates = []
+
+        # remove any questions in previous questions
+        for question in query_questions:
+            if question['id'] not in previous_ids:
+                question_candidates.append(question)
+
+        # set response question to none if all questions have been used
+        if len(question_candidates) == 0:
+            question_choice = None
+        else:
+            # select random question from list of candidates
+            question_choice = random.choice(question_candidates)
+
+        return jsonify({
+            'success': True, 
+            'question': question_choice
+        })
 
     """
     @TODO:
